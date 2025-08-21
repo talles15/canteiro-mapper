@@ -242,7 +242,7 @@ const app = {
         posicao: pos,
         tipoTeste: state.configuracao.tipoTeste,
         timestamp: new Date().toISOString(),
-        dataPlantioAmostra: state.configuracao.data,
+        dataPlantioAmostra: state.configuracao.data, // define data do canteiro para QR
       });
       storage.save(state.configuracao.canteiro, {
         configuracao: state.configuracao, amostras: state.amostras, ultimaAtualizacao: new Date().toISOString()
