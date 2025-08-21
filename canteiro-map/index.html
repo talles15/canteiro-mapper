@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="🌱 Sistema de Mapeamento de Canteiros com QR Code" />
+  <meta name="theme-color" content="#2E8B57" />
+  <title>Mapeamento de Canteiros</title>
+
+  <!-- Manifest + PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" sizes="32x32" href="assets/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="assets/styles.css" />
+
+  <!-- QR Scanner (CDN) -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qr-scanner/1.4.2/qr-scanner.umd.min.js"></script>
+  <!-- jsPDF (CDN) -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- App -->
+  <script type="module" defer src="assets/app.js"></script>
+</head>
+<body>
+  <noscript>Ative o JavaScript para usar esta aplicação.</noscript>
+  <div class="container">
+    <div class="header">
+      <h1>🌱 Sistema de Mapeamento de Canteiros</h1>
+      <p>Controle de plantio de testes com QR Code</p>
+    </div>
+
+    <!-- Menu Principal -->
+    <div id="main-menu" class="panel main-menu active">
+      <div class="menu-grid">
+        <button class="btn btn-primary btn-large" data-action="novo-canteiro">
+          <span class="emoji">🆕</span>
+          <span>Novo Canteiro</span>
+        </button>
+
+        <button class="btn btn-accent btn-large" data-action="toggle-salvos">
+          <span class="emoji">📂</span>
+          <span>Canteiros Salvos</span>
+        </button>
+
+        <button class="btn btn-info btn-large" data-action="importar-dados">
+          <span class="emoji">📥</span>
+          <span>Importar Dados</span>
+        </button>
+      </div>
+
+      <div id="saved-canteiros-list" class="hidden">
+        <h3 class="mb-15">📋 Canteiros Salvos:</h3>
+        <div id="canteiros-container"></div>
+      </div>
+    </div>
+
+    <!-- Painel de Configuração -->
+    <div id="setup-panel" class="panel" aria-labelledby="setup-title">
+      <h2 id="setup-title" class="sr-only">Configuração do Canteiro</h2>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="canteiro-num">Número do Canteiro</label>
+          <input type="text" id="canteiro-num" class="form-control" placeholder="Ex: C001" required aria-required="true" autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label for="data-plantio">Data do Plantio do Canteiro</label>
+          <input type="date" id="data-plantio" class="form-control" required aria-required="true">
+        </div>
+
+        <div class="form-group">
+          <label for="tipo-teste">Tipo de Teste</label>
+          <select id="tipo-teste" class="form-control" required aria-required="true">
+            <option value="">Selecione...</option>
+            <option value="GA">GA - Germinação</option>
+            <option value="EA48">EA48 - Envelhecimento 48h</option>
+            <option value="EA72">EA72 - Envelhecimento 72h</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Lado do Canteiro para Iniciar</label>
+          <div class="button-group">
+            <button class="btn btn-toggle" data-lado="esquerdo" aria-pressed="false">⬅️ Esquerdo</button>
+            <button class="btn btn-toggle active" data-lado="direito" aria-pressed="true">Direito ➡️</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="buttons">
+        <button class="btn btn-primary" data-action="iniciar-scan">📱 Leitura QR</button>
+        <button class="btn btn-secondary" data-action="entrada-manual">✏️ Entrada Manual</button>
+        <button class="btn btn-info" data-action="voltar-menu">🏠 Menu</button>
+      </div>
+    </div>
+
+    <!-- Painel de Leitura QR -->
+    <div id="scanning-panel" class="panel" aria-labelledby="scan-title" aria-live="polite">
+      <h2 id="scan-title" class="sr-only">Leitura de QR Code</h2>
+      <div class="status-bar">
+        <span id="scan-status">Preparando câmera...</span>
+      </div>
+
+      <div class="center">
+        <div class="camera-container" role="region" aria-label="Visualização da câmera">
+          <video id="qr-video" playsinline></video>
+          <div class="scanning-overlay" aria-hidden="true"></div>
+        </div>
+
+        <div class="info-box">
+          <strong>Amostras Lidas: <span id="sample-count">0</span>/90</strong><br>
+          <small>Lado atual: <span id="current-side">Direito</span></small>
+        </div>
+
+        <div class="info-box">
+          <p><strong>📋 Como usar:</strong></p>
+          <ol class="howto">
+            <li>Posicione o QR code dentro do quadrado</li>
+            <li>O código será lido automaticamente</li>
+            <li>A amostra é adicionada na sequência</li>
+          </ol>
+          <p><small>💡 Capacidade: 90 amostras (45 por lado)</small></p>
+        </div>
+      </div>
+
+      <div class="buttons">
+        <button class="btn btn-secondary" data-action="trocar-lado">🔄 Trocar Lado</button>
+        <button class="btn btn-primary" data-action="finalizar-scan">✅ Finalizar</button>
+        <button class="btn btn-danger" data-action="parar-scan">❌ Parar</button>
+      </div>
+    </div>
+
+    <!-- Painel de Entrada Manual -->
+    <div id="manual-entry-panel" class="panel" aria-labelledby="manual-title">
+      <h2 id="manual-title" class="center-title">📝 Entrada Manual de Amostra</h2>
+
+      <div class="form-group">
+        <label for="manual-codigo">Códigos das Amostras</label>
+        <input type="text" id="manual-codigo" class="form-control" placeholder="Ex: 10;20;30 ou apenas 10" autocomplete="off">
+        <small class="muted">💡 <strong>Múltiplas amostras:</strong> Separe por ponto e vírgula (;)</small>
+      </div>
+
+      <div class="form-group">
+        <label for="manual-tipo-teste-individual">Tipo de Teste</label>
+        <select id="manual-tipo-teste-individual" class="form-control">
+          <option value="">Selecione...</option>
+          <option value="GA">GA - Germinação</option>
+          <option value="EA48">EA48 - Envelhecimento 48h</option>
+          <option value="EA72">EA72 - Envelhecimento 72h</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="manual-tipo-remessa">Origem da Amostra</label>
+        <select id="manual-tipo-remessa" class="form-control">
+          <option value="">Selecione...</option>
+          <option value="Lote">Lote</option>
+          <option value="TSI">TSI</option>
+          <option value="Carregamento">Carregamento</option>
+          <option value="Teste">Teste</option>
+          <option value="Reclamação">Reclamação</option>
+          <option value="Entrada de Semente">Entrada de Semente</option>
+        </select>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="manual-lado">Lado do Canteiro</label>
+          <select id="manual-lado" class="form-control">
+            <option value="direito">Direito</option>
+            <option value="esquerdo">Esquerdo</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="manual-posicao">Posição Inicial</label>
+          <input type="number" id="manual-posicao" class="form-control" min="1" placeholder="Ex: 1">
+        </div>
+
+        <div class="form-group">
+          <label for="manual-data-plantio">Data do plantio da amostra</label>
+          <input type="date" id="manual-data-plantio" class="form-control">
+          <small class="muted">Se vazio, usa a data do canteiro.</small>
+        </div>
+      </div>
+
+      <div id="preview-area" class="preview-area hidden" aria-live="polite">
+        <strong>📋 Preview das amostras:</strong>
+        <div id="preview-content"></div>
+      </div>
+
+      <div class="buttons">
+        <button class="btn btn-primary" data-action="adicionar-manual">➕ Adicionar</button>
+        <button class="btn btn-info" data-action="preview-manual">👁️ Preview</button>
+        <button class="btn btn-secondary" data-action="voltar-setup">⬅️ Voltar</button>
+      </div>
+    </div>
+
+    <!-- Painel do Mapa -->
+    <div id="map-panel" class="panel" aria-labelledby="map-title">
+      <h2 id="map-title" class="sr-only">Mapa do Canteiro</h2>
+      <div class="panel-box center">
+        <h3 id="canteiro-title" class="title">Mapa do Canteiro</h3>
+        <p id="canteiro-details">Detalhes do plantio</p>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table" id="mapa-table">
+          <thead>
+            <tr>
+              <th>Posição</th>
+              <th>Lado Esquerdo</th>
+              <th>Lado Direito</th>
+            </tr>
+          </thead>
+          <tbody id="mapa-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="buttons">
+        <button class="btn btn-primary" data-action="continuar-adicionando">➕ Continuar</button>
+        <button class="btn btn-secondary" data-action="entrada-manual">✏️ Manual</button>
+        <button class="btn btn-warning" data-action="limpar-canteiro">🧹 Limpar</button>
+        <button class="btn btn-info" data-action="exportar-json">📄 JSON</button>
+        <button class="btn btn-info" data-action="exportar-pdf">📑 PDF</button>
+        <button class="btn btn-secondary" data-action="voltar-menu">🏠 Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Confirmação -->
+  <dialog id="confirmModal" class="modal">
+    <form method="dialog" class="modal-content">
+      <h3 id="modal-title">Confirmar Ação</h3>
+      <p id="modal-message">Tem certeza?</p>
+      <div class="buttons">
+        <button class="btn btn-danger" id="modal-confirm" value="confirm">Confirmar</button>
+        <button class="btn btn-secondary" value="cancel">Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Input oculto para importar arquivos -->
+  <input type="file" id="import-input" accept=".json" class="hidden" />
+
+  <!-- Toast container -->
+  <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+    // Registrar SW (PWA)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js');
+      });
+    }
+  </script>
+</body>
+</html>
